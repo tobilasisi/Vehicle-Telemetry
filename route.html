@@ -1,0 +1,281 @@
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <link rel="icon" href="../../favicon.ico">
+
+    <title>FedEx Vehicle Telemetry</title>
+
+    <!-- Bootstrap core CSS -->
+    <link href="dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Custom styles for this template -->
+    <link href="dashboard.css" rel="stylesheet">
+
+    <script src="dist/js/jquery.min.js"></script>
+    <script src="dist/js/bootstrap.min.js"></script>
+    <script>
+        $(document).ready(function () {
+            $('.dropdown-toggle').dropdown();
+        });
+    </script>
+
+    <script type="text/javascript">
+        function navigateToVehicle() {
+            var urlParams = new URLSearchParams(window.location.search);
+            var vehicleID = urlParams.get('id');
+            var destination = 'vehicle.html?id=' + vehicleID;
+            console.log(destination);
+            window.location.href = destination;
+        }
+    </script>
+
+    <script>
+        var map;
+        var directionsService;
+        var directionsDisplay;
+        var urlParams = new URLSearchParams(window.location.search);
+        var vehicleID = urlParams.get('id');
+        var routeID=vehicleID<=3?vehicleID:1;
+        function initMap() {
+            directionsService = new google.maps.DirectionsService();
+            directionsDisplay = new google.maps.DirectionsRenderer();
+
+            map = new google.maps.Map(document.getElementById('map'), {
+                center: {lat: 35.1188187, lng: -89.838592},
+                zoom: 13
+            });
+            directionsDisplay.setMap(map);
+        }
+
+        function loadRoute(id) {
+            downloadUrl('https://advanced-hci-project.appspot.com/route?id='+id, function (data) {
+                var route = JSON.parse(data.response);
+                var stops = route["stops"]
+                plotRouteThroughStops(directionsDisplay, stops)
+
+                document.getElementById("vehicle-id").innerHTML=route.vehicleID;
+                document.getElementById("driver-name").innerHTML=route.courierID;
+                document.getElementById("departure-time").innerHTML=route.departureTime;
+                document.getElementById("return-time").innerHTML=route.returnTime;
+                document.getElementById("avg-stop").innerHTML=route.averageStopped;
+                document.getElementById("total-stop").innerHTML=route.totalStopped;
+                document.getElementById("total-idle").innerHTML=route.totalIdleTime;
+                document.getElementById("route-mileage").innerHTML=route.totalMiles;
+
+                var stopReport=document.getElementById("stop-report");
+                var i=0;
+                for(i=0; i<stops.length; i++){
+                    var stop1 = document.createElement("DIV");
+                    stop1.innerHTML = "<div class='col-xs-6' style='margin-bottom: 20px'>Stop:</div><div class='col-xs-6' style='margin-bottom: 20px'>"+ stops[i].stopID+"</div>" ;
+                    stopReport.appendChild(stop1);
+
+                    var stop4 = document.createElement("DIV");
+                    stop4.innerHTML = "<div class='col-xs-6' style='margin-bottom: 20px'>Address:</div><div class='col-xs-6' style='margin-bottom: 20px'>"+ stops[i].address+"</div>";
+                    stopReport.appendChild(stop4);
+
+                    var stop2 = document.createElement("DIV");
+                    stop2.innerHTML = "<div class='col-xs-6' style='margin-bottom: 20px'>Distance to next stop:</div><div class='col-xs-6' style='margin-bottom: 40px'>"+ stops[i].distanceToNext+"</div>";
+                    stopReport.appendChild(stop2);
+
+                    var stop3 = document.createElement("DIV");
+                    stop3.innerHTML = "<div class='col-xs-6' style='margin-bottom: 20px'>Distance to next stop:</div><div class='col-xs-6' style='margin-bottom: 20px'>"+ stops[i].distanceToNext+"</div>";
+                    stopReport.appendChild(stop3);
+
+                    var endStop=document.createElement("DIV");
+                    endStop.innerHTML="<div class='col-xs-12' style='margin-bottom: 20px'></div>";
+                    stopReport.appendChild(endStop);
+                }
+
+            });
+        }
+
+    </script>
+
+
+    <script src="fedex_project.js"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCB7RLnUGazRoZCf3Lx1x8n64HAPS7iYEk&callback=initMap"
+            async defer></script>
+    <style>
+        /* Always set the map height explicitly to define the size of the div
+         * element that contains the map. */
+        #map {
+            height: 100%;
+        }
+    </style>
+
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons"
+          rel="stylesheet">
+
+</head>
+<body>
+
+<nav class="navbar navbar-inverse navbar-fixed-top" style="background-color: #5e5e5e">
+    <div class="container-fluid">
+        <div class="navbar-header" style="background-color: #5e5e5e;">
+            <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar"
+                    aria-expanded="false" aria-controls="navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+            </button>
+            <img src="https://cdn.freebiesupply.com/logos/large/2x/fedex-51-logo-black-and-white.png"
+                 style="max-height: 5vh; margin-top: 2px; margin-left: 2px" onclick="window.location.href='index.html'">
+            <a class="navbar-brand" style="float: none;" href="#">Vehicle Telemetry</a>
+        </div>
+        <div id="navbar" class="navbar-collapse collapse">
+            <ul class="nav navbar-nav navbar-right">
+                <li><a href="#">Log Out</a></li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-xs-1.5 sidebar">
+            <ul class="nav nav-sidebar">
+                <li><a href="#"><i class="material-icons side"
+                                   onclick="window.location.href='index.html'">view_module</i></a></li>
+                <li><a href="#"><i class="material-icons side" onclick="navigateToVehicle()">time_to_leave</i></a></li>
+                <li class="active"><a href="#"><i class="material-icons side-active">place</i></a></li>
+            </ul>
+        </div>
+
+
+        <div class="col-xs-11" style="margin-left: 40px">
+            <!-- Nav tabs -->
+            <ul class="nav nav-tabs device-small" role="tablist">
+                <li role="presentation" class="active"><a href="#route" aria-controls="home" role="tab"
+                                                          data-toggle="tab">Map</a></li>
+                <li role="presentation"><a href="#detail" aria-controls="profile" role="tab"
+                                           data-toggle="tab">Report</a></li>
+                <li role="presentation"><a href="#info" aria-controls="info" role="tab" data-toggle="tab">Overview</a>
+                </li>
+            </ul>
+
+            <!-- Tab panes -->
+            <div class="tab-content">
+
+                <div role="tabpanel" class="tab-pane active col col-xs-12 col-md-6 col-md-push-6" id="route"
+                     style="margin-top: 20px; margin-left: 0">
+
+                    <div class="row-dropdowns">
+                        <div class="col-xs-4">
+                            <div class="container-fluid">
+                                <div class="col-xs-12 " style="margin-right: 0; margin-bottom: 10px">
+
+                                    <div class="col-xs-12 " style="margin-right: 0; margin-bottom: 0">
+                                        <label for="start">Date:</label>
+
+                                        <input type="date" id="start" name="start-date"
+                                               value="2018-12-06"
+                                               min="2018-12-06" max="2018-12-06">
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="placeholder-map">
+                        <div id="map" style="max-height: 80vh; margin-bottom: 20px; margin-left: 0; margin-top: 70px">
+                        </div>
+                    </div>
+
+                </div>
+
+                <div role="tabpanel" class="tab-pane col-xs-12 col-md-3 col-md-pull-3" id="detail"
+                     style="margin-top: 63px; margin-left: 0;">
+                    <span style="font-size: 20px">Stop Information:</span>
+                    <div class="container-fluid" style="border:1px solid #cecece;">
+                        <div class="pre-scrollable" style="margin-top: 10px; max-height: 78vh;">
+                            <div class="pre-scrollable" style="margin-top: 10px; max-height: 78vh;">
+                                <div class="col-xs-12" id="stop-report"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div role="tabpanel" class="tab-pane col-xs-12 col-md-3 col-md-pull-9" id="info"
+                     style="margin-top:90px; margin-left: 0">
+
+                    <div class="container-fluid">
+                        <div class="col-xs-12">
+                            <a class="weatherwidget-io" href="https://forecast7.com/en/40d71n74d01/new-york/?unit=us"
+                               data-label_1="Memphis" data-label_2="WEATHER" data-mode="Current" data-theme="dark">Memphis
+                                WEATHER</a>
+                            <script>
+                                !function (d, s, id) {
+                                    var js, fjs = d.getElementsByTagName(s)[0];
+                                    if (!d.getElementById(id)) {
+                                        js = d.createElement(s);
+                                        js.id = id;
+                                        js.src = 'https://weatherwidget.io/js/widget.min.js';
+                                        fjs.parentNode.insertBefore(js, fjs);
+                                    }
+                                }(document, 'script', 'weatherwidget-io-js');
+                            </script>
+                        </div>
+                    </div>
+
+                    <div class="container-fluid" style="margin-top: 50px; background-color: #f5f5f5">
+                        <div class="col-xs-12" style="margin-bottom: 10px">
+                            <div class="col-xs-6">Vehicle ID:</div>
+                            <div class="col-xs-6" id="vehicle-id"></div>
+                        </div>
+
+                        <div class="col-xs-12" style="margin-bottom: 10px">
+                            <div class="col-xs-6">Driver:</div>
+                            <div class="col-xs-6" id="driver-name"></div>
+                        </div>
+
+                        <div class="col-xs-12" style="margin-bottom: 10px">
+                            <div class="col-xs-6">Departure Time:</div>
+                            <div class="col-xs-6" id="departure-time"></div>
+                        </div>
+
+                        <div class="col-xs-12" style="margin-bottom: 10px">
+                            <div class="col-xs-6">Return Time:</div>
+                            <div class="col-xs-6" id="return-time"></div>
+                        </div>
+
+                        <div class="col-xs-12" style="margin-bottom: 10px">
+                            <div class="col-xs-6">Average Stop Time (min):</div>
+                            <div class="col-xs-6" id="avg-stop"></div>
+                        </div>
+
+                        <div class="col-xs-12" style="margin-bottom: 10px">
+                            <div class="col-xs-6">Total Stop Time (min):</div>
+                            <div class="col-xs-6" id="total-stop"></div>
+                            <br>
+                        </div>
+
+                        <div class="col-xs-12" style="margin-bottom: 10px">
+                            <div class="col-xs-6">Total Idle Time (min):</div>
+                            <div class="col-xs-6" id="total-idle"></div>
+                        </div>
+
+                        <div class="col-xs-12" style="margin-bottom: 10px">
+                            <div class="col-xs-6">Total Mileage:</div>
+                            <div class="col-xs-6" id="route-mileage"></div>
+                        </div>
+
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+
+<script>loadRoute(routeID);</script>
+</body>
+</html>

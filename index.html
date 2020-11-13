@@ -1,0 +1,400 @@
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <link rel="icon" href="../../favicon.ico">
+
+    <title>FedEx Vehicle Telemetry</title>
+
+    <!-- Bootstrap core CSS -->
+    <link href="dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Custom styles for this template -->
+    <link href="dashboard.css" rel="stylesheet">
+
+    <script src="dist/js/jquery.min.js"></script>
+    <script src="dist/js/bootstrap.min.js"></script>
+    <script>
+        $(document).ready(function () {
+            $('.dropdown-toggle').dropdown();
+        });
+    </script>
+
+    <script>
+        var map;
+        var markers = [];
+        var order="alerts";
+        var station=null;
+        var route=null;
+        function initMap() {
+            map = new google.maps.Map(document.getElementById('map'), {
+                center: {lat: 33.46, lng: -88.81},
+                zoom: 15
+            });
+        }
+    </script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCB7RLnUGazRoZCf3Lx1x8n64HAPS7iYEk&callback=initMap"
+            async defer></script>
+    <script src="fedex_project.js"></script>
+    <script>
+        function setMapOnAll(map) {
+            for (var i = 0; i < markers.length; i++) {
+                markers[i].setMap(map);
+            }
+        }
+        function loadVehicles() {
+            setMapOnAll(null);
+            markers=[];
+            document.getElementById("vehicle-tiles").innerHTML = "";
+            //above line clears the vehicle tabs of all previous instances so that it can reload them
+            //get vehicles
+            url = 'https://advanced-hci-project.appspot.com/vehicles';
+            if (order != null || station != null || route != null) {
+                url = url + '?';
+            }
+            if (order != null) {
+                url = url + "order=" + order;
+                if (station != null || route != null) {
+                    url = url + "&";
+                }
+            }
+            if (station != null) {
+                url = url + "station=" + station;
+                if (route != null) {
+                    url = url + "&";
+                }
+            }
+            if (route != null) {
+                url = url + "route=" + route;
+            }
+            downloadUrl(url, function (data) {
+                    var vehicles = JSON.parse(data.response);
+                    
+                    downloadUrl('https://advanced-hci-project.appspot.com/active_alerts', function (adata) {
+                        var active_alerts = JSON.parse(adata.response);
+
+                        if(filters.active!="off") {
+                            var notCaught = [];
+                            Array.prototype.forEach.call(active_alerts, function (alert) {
+                                notCaught.push(alert.vehicleID);
+                            });
+                            Array.prototype.forEach.call(vehicles, function (vehicle) {
+                                if(!(notCaught.includes(vehicle.vehicleID))&&(vehicle.vehicleID!=-1)) {
+                                    vehicle.vehicleID=-1;
+                                }
+                            });
+                        }
+
+                        downloadUrl('https://advanced-hci-project.appspot.com/vehicles_in_field', function (fdata) {
+                            var inField = JSON.parse(fdata.response);
+
+                            if(filters.inField!="off") {
+                                var notCaught = [];
+                                Array.prototype.forEach.call(inField, function (fielded) {
+                                    notCaught.push(fielded.vehicleID);
+                                });
+                                Array.prototype.forEach.call(vehicles, function (vehicle) {
+                                    if(!(notCaught.includes(vehicle.vehicleID))&&(vehicle.vehicleID!=-1)) {
+                                        vehicle.vehicleID=-1;
+                                    }
+                                });
+                            }
+
+                            downloadUrl('https://advanced-hci-project.appspot.com/idle_vehicles', function (idata) {
+                                var idles = JSON.parse(idata.response);
+
+                                if(filters.idle!="off") {
+                                    var notCaught = [];
+                                    Array.prototype.forEach.call(idles, function (idle) {
+                                        notCaught.push(idle.vehicleID);
+                                    });
+                                    Array.prototype.forEach.call(vehicles, function (vehicle) {
+                                        if(!(notCaught.includes(vehicle.vehicleID))&&(vehicle.vehicleID!=-1)) {
+                                            vehicle.vehicleID=-1;
+                                        }
+                                    });
+                                }
+
+                                // needs to be put in the deepest possible
+                                var vehicle_tiles = document.getElementById("vehicle-tiles");
+
+                                Array.prototype.forEach.call(vehicles, function (vehicle) {
+                                    if(vehicle.vehicleID!=-1) {
+                                        vehicle_tiles.appendChild(constructVehicleTile(vehicle));
+                                        createMarker(vehicle, map);
+                                    }
+                                });
+
+                                
+                            });
+                        });
+                    });
+                }
+            )
+            ;
+        }
+        function loadVisData() {
+            downloadUrl('https://advanced-hci-project.appspot.com/count_vehicles_in_field', function (data) {
+                var vehicles = JSON.parse(data.response);
+                console.log("Vehicles in Field:");
+                console.log(vehicles);
+                document.getElementById("vehicles-field").innerHTML = vehicles;
+            });
+            downloadUrl('https://advanced-hci-project.appspot.com/count_active_alerts', function (data) {
+                var vehicles = JSON.parse(data.response);
+                console.log("Active Alerts:");
+                console.log(vehicles);
+                document.getElementById("active-alerts").innerHTML = vehicles;
+            });
+            downloadUrl('https://advanced-hci-project.appspot.com/count_idle_vehicles', function (data) {
+                var vehicles = JSON.parse(data.response);
+                console.log("Idle Vehicles:");
+                console.log(vehicles);
+                document.getElementById("idle-vehicles").innerHTML = vehicles;
+            });
+            downloadUrl('https://advanced-hci-project.appspot.com/count_today_packages', function (data) {
+                var vehicles = JSON.parse(data.response);
+                console.log("Today Packages:");
+                console.log(vehicles);
+                document.getElementById("deliveries-day").innerHTML = vehicles;
+            });
+        }
+
+        function filterInField() {
+            var field = document.getElementsByClassName("in-field-toggle")[0];
+            if(filters.inField=="off") {
+                filters.inField="on";
+
+                field.children[0].children[0].style="color: #FFFFFF";
+                field.style="background-color: #996699"
+
+            }
+            else {
+                filters.inField="off";
+
+                field.children[0].children[0].style="color: #996699";
+                field.style="background-color: #FFFFFF"
+            }
+            loadVehicles();
+        }
+
+        function filterActiveAlerts() {
+            var field = document.getElementsByClassName("active-alerts-toggle")[0];
+            if(filters.active=="off") {
+                filters.active="on";
+
+                field.children[0].children[0].style="color: #FFFFFF";
+                field.style="background-color: #CC0000"
+
+            }
+            else {
+                filters.active="off";
+
+                field.children[0].children[0].style="color: #CC0000";
+                field.style="background-color: #FFFFFF"
+            }
+            loadVehicles();
+        }
+
+        function filterIdleVehicles() {
+            var field = document.getElementsByClassName("idle-vehicles-toggle")[0];
+            if(filters.idle=="off") {
+                filters.idle="on";
+
+                field.children[0].children[0].style="color: #FFFFFF";
+                field.style="background-color: #CC0000"
+
+            }
+            else {
+                filters.idle="off";
+
+                field.children[0].children[0].style="color: #CC0000";
+                field.style="background-color: #FFFFFF"
+            }
+            loadVehicles();
+        }
+    </script>
+
+
+    <style>
+        /* Always set the map height explicitly to define the size of the div
+         * element that contains the map. */
+        #map {
+            height: 100%;
+        }
+    </style>
+
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons"
+          rel="stylesheet">
+
+</head>
+<body>
+
+<nav class="navbar navbar-inverse navbar-fixed-top" style="background-color: #5e5e5e">
+    <div class="container-fluid">
+        <div class="navbar-header" style="background-color: #5e5e5e;">
+            <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar"
+                    aria-expanded="false" aria-controls="navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+            </button>
+            <img src="https://cdn.freebiesupply.com/logos/large/2x/fedex-51-logo-black-and-white.png"
+                 style="max-height: 5vh; margin-top: 2px; margin-left: 2px" onclick="window.location.href='index.html'">
+            <a class="navbar-brand" style="float: none;" href="#">Vehicle Telemetry</a>
+        </div>
+        <div id="navbar" class="navbar-collapse collapse">
+            <ul class="nav navbar-nav navbar-right">
+                <li><a href="#">Log Out</a></li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-xs-1.5 sidebar">
+            <ul class="nav nav-sidebar">
+                <li class="active"><a href="#"><i class="material-icons side-active">view_module</i></a></li>
+            </ul>
+        </div>
+
+
+        <div class="col-xs-11" style="margin-left: 40px">
+            <!-- Nav tabs -->
+            <ul class="nav nav-tabs device-small" role="tablist">
+                <li role="presentation" class="active"><a href="#home" aria-controls="home" role="tab"
+                                                          data-toggle="tab">Vehicles</a></li>
+                <li role="presentation"><a href="#profile" aria-controls="profile" role="tab" data-toggle="tab">Map</a>
+                </li>
+            </ul>
+
+            <!-- Tab panes -->
+            <div class="tab-content">
+
+                <div role="tabpanel" class="tab-pane active col col-xs-12 col-md-6 col-md-push-6" id="home"
+                     style="margin-top: 20px; margin-left: 0">
+
+                    <div class="row-dropdowns">
+                        <div class="col-xs-4">
+                            <div class="dropdown">
+                                <button class="btn btn-default dropdown-toggle" type="button" id="dropdownMenu1"
+                                        data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
+                                    Station
+                                    <span class="caret"></span>
+                                </button>
+                                <ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
+                                    <li><a href="#" onclick="station=null;loadVehicles()">None</a></li>
+                                    <li><a href="#" onclick="station='1';loadVehicles()">Station 1</a></li>
+                                    <li><a href="#" onclick="station='2';loadVehicles()">Station 2</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="col-xs-4">
+                            <div class="dropdown">
+                                <button class="btn btn-default dropdown-toggle" type="button" id="dropdownMenu2"
+                                        data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
+                                    Route
+                                    <span class="caret"></span>
+                                </button>
+                                <ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
+                                    <li><a href="#" onclick="route=null;loadVehicles()">None</a></li>
+                                    <li><a href="#" onclick="route='1';loadVehicles()">Route 1</a></li>
+                                    <li><a href="#" onclick="route='2';loadVehicles()">Route 2</a></li>
+                                    <li><a href="#" onclick="route='3';loadVehicles()">Route 3</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="col-xs-4">
+                            <div class="dropdown">
+                                <button class="btn btn-default dropdown-toggle" type="button" id="dropdownMenu3"
+                                        data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
+                                    Sort By
+                                    <span class="caret"></span>
+                                </button>
+                                <ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
+                                    <li><a href="#" onclick="order='alerts';loadVehicles()">Notification</a></li>
+                                    <li><a href="#" onclick="order='vin';loadVehicles()">Vin Number</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pre-scrollable" style="max-height: 80vh; margin-top: 50px">
+                        <div class="row-panels" id="vehicle-tiles">
+                        </div>
+                    </div>
+
+                </div>
+
+                <div role="tabpanel" class="tab-pane col-xs-12 col-md-6 col-md-pull-6" id="profile"
+                     style="margin-top:20px; margin-left: 0">
+
+                    <div class="placeholder-map">
+                        <div id="map" style="max-height: 45vh; margin-bottom: 20px; margin-left: 0">
+                        </div>
+                    </div>
+
+                    <div class="container-fluid">
+
+                        <div class="col-xs-5 in-field-toggle" style="margin-bottom: 20px" onclick="filterInField()">
+                            <div class="col-xs-7">
+                                <i class="material-icons vis">local_shipping</i>
+                            </div>
+                            <div class="col-xs-12 col-md-3" style="font-size: 36px" id="vehicles-field"></div>
+                            <div class="col-xs-12" style="margin-bottom: 20px" align="center">
+                                Vehicles in the field
+                            </div>
+                        </div>
+
+                        <div class="col-xs-5 active-alerts-toggle" style="margin-bottom: 20px" onclick="filterActiveAlerts()">
+                            <div class="col-xs-7">
+                                <i class="material-icons vis" style="color: #CC0000">warning</i>
+                            </div>
+                            <div class="col-xs-12 col-md-3" style="font-size: 36px" id="active-alerts"></div>
+                            <div class="col-xs-12" style="margin-bottom: 20px" align="center">
+                                Active alerts<br><br>
+                            </div>
+                        </div>
+
+                        <div class="col-xs-5 idle-vehicles-toggle" style="margin-bottom: 20px" onclick="filterIdleVehicles()">
+                            <div class="col-xs-7">
+                                <i class="material-icons vis" style="color: #CC0000">timer</i>
+                            </div>
+                            <div class="col-xs-12 col-md-3" style="font-size: 36px" id="idle-vehicles"></div>
+                            <div class="col-xs-12" style="margin-bottom: 20px" align="center">
+                                Idle vehicles<br><br>
+                            </div>
+                        </div>
+
+                        <div class="col-xs-5" style="margin-bottom: 20px">
+                            <div class="col-xs-7">
+                                <i class="material-icons vis">mail</i>
+                            </div>
+                            <div class="col-xs-12 col-md-3" style="font-size: 36px" id="deliveries-day"></div>
+                            <div class="col-xs-12" style="margin-bottom: 20px" align="center">
+                                Deliveries for the day
+                            </div>
+                        </div>
+
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+
+<script>
+    loadVehicles();
+    var filters = {station:"all", route:"all", inField:"off", active:"off", idle:"off"};</script>
+<script>loadVisData()</script>
+</body>
+</html>
